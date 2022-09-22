@@ -1,0 +1,9 @@
+{
+  "editor.formatOnSave": true,
+  // 自动设定eslint工作区
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+}
