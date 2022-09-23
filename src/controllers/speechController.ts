@@ -1,16 +1,22 @@
 import { logger } from '../utils/logger'
+import EventEmitter from 'eventemitter3'
 import VoiceControlGame from '..'
 
 const TAG_NAME = 'SpeechController'
 
-// TODO 持续监听，结果每次单独返回
-class SpeechController {
+export interface SpeechControllerEventTypes {
+  onSpeechResult: (res: string) => void
+}
+
+class SpeechController extends EventEmitter<SpeechControllerEventTypes> {
   recognition: SpeechRecognition
 
   constructor(private root: VoiceControlGame) {
+    super()
     this.recognition = new (window.SpeechRecognition ||
       window.webkitSpeechRecognition)()
     this.recognition.lang = this.root.opt.lang
+    this.recognition.continuous = true
 
     this.recognition.onstart = this.onstart
     this.recognition.onend = this.onend
@@ -41,6 +47,7 @@ class SpeechController {
   }
 
   destroy() {
+    logger.log(TAG_NAME, 'destroy')
     this.recognition.onstart = null
     this.recognition.onend = null
     this.recognition.onaudiostart = null
@@ -88,8 +95,9 @@ class SpeechController {
 
   private onresult = (event: SpeechRecognitionEvent) => {
     logger.log(TAG_NAME, 'onresult', event)
-    const res = event.results[0][0].transcript
-    this.root.emitter.emit('onSpeechResult', res)
+    const len = event.results.length
+    const res = event.results[len - 1][0].transcript
+    this.emit('onSpeechResult', res)
   }
 
   private onnomatch = (event: SpeechRecognitionEvent) => {

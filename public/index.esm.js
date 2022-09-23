@@ -769,14 +769,16 @@ const logger = logDebug({
 });
 
 const TAG_NAME$1 = 'SpeechController';
-class SpeechController {
+class SpeechController extends eventemitter3 {
     root;
     recognition;
     constructor(root) {
+        super();
         this.root = root;
         this.recognition = new (window.SpeechRecognition ||
             window.webkitSpeechRecognition)();
         this.recognition.lang = this.root.opt.lang;
+        this.recognition.continuous = true;
         this.recognition.onstart = this.onstart;
         this.recognition.onend = this.onend;
         this.recognition.onaudiostart = this.onaudiostart;
@@ -802,6 +804,7 @@ class SpeechController {
         this.recognition.abort();
     }
     destroy() {
+        logger.log(TAG_NAME$1, 'destroy');
         this.recognition.onstart = null;
         this.recognition.onend = null;
         this.recognition.onaudiostart = null;
@@ -840,8 +843,9 @@ class SpeechController {
     };
     onresult = (event) => {
         logger.log(TAG_NAME$1, 'onresult', event);
-        const res = event.results[0][0].transcript;
-        this.root.emitter.emit('onSpeechResult', res);
+        const len = event.results.length;
+        const res = event.results[len - 1][0].transcript;
+        this.emit('onSpeechResult', res);
     };
     onnomatch = (event) => {
         logger.log(TAG_NAME$1, 'onnomatch', event);
@@ -858,6 +862,14 @@ const rangeArrItem = (arr) => {
     const index = rangeNum(0, arr.length - 1);
     return arr[index];
 };
+const rangeRgb = () => {
+    //rgb颜色随机
+    const r = Math.floor(Math.random() * 256);
+    const g = Math.floor(Math.random() * 256);
+    const b = Math.floor(Math.random() * 256);
+    const rgb = 'rgb(' + r + ',' + g + ',' + b + ')';
+    return rgb;
+};
 
 class Word {
     canvasDom;
@@ -865,48 +877,51 @@ class Word {
     content;
     width;
     height = rangeNum(14, 30);
-    top = -this.height;
+    top = 0;
     left;
+    font = this.height + 'px serif';
+    fillStyle = rangeRgb();
     score = Math.floor((1 / this.height) * 100);
     constructor(canvasDom, ctx, content) {
         this.canvasDom = canvasDom;
         this.ctx = ctx;
         this.content = content;
-        this.left = rangeNum(0, this.canvasDom.width - this.height);
         this.width = this.ctx.measureText(this.content).width;
+        this.left = rangeNum(0, this.canvasDom.width - this.width);
     }
 }
 
 var enUS = [
     'apple',
     'banana',
-    'hello',
-    'world',
-    'you',
-    'and',
-    'me',
-    'love',
-    'sky',
-    'blue',
-    'yellow',
+    'pear',
+    'tangerine',
+    'pineapple',
+    'durian',
+    'hawthorn',
+    'orange',
+    'watermelon',
+    'mangosteen',
+    'grape',
 ];
 
 var zhCN = [
     '苹果',
     '香蕉',
-    '你好',
-    '世界',
-    '你',
-    '和',
-    '我',
-    '爱',
-    '天空',
-    '蓝色',
-    '黄色',
+    '梨子',
+    '橘子',
+    '菠萝',
+    '榴莲',
+    '山楂',
+    '橙子',
+    '西瓜',
+    '山竹',
+    '葡萄',
 ];
 
 const TAG_NAME = 'GameController';
-class GameController {
+// TODO 交互优化
+class GameController extends eventemitter3.EventEmitter {
     root;
     canvasDom;
     ctx;
@@ -921,26 +936,47 @@ class GameController {
     score = 0;
     words = [];
     constructor(root) {
+        super();
         this.root = root;
         if (!this.root.opt.canvasDom.getContext('2d')) {
             throw Error('Your broswer is not support Canvas.');
         }
         this.canvasDom = this.root.opt.canvasDom;
         this.ctx = this.canvasDom.getContext('2d');
-        this.root.emitter.on('onSpeechResult', this.onSpeechResult);
+        this.root.speechController.on('onSpeechResult', this.onSpeechResult);
     }
     start() {
+        logger.log(TAG_NAME, 'start');
         this.startDraw();
+        this.emit('gameStart');
+        this.emit('updateCountdown', this.countdown);
+        this.emit('updateScore', this.score);
     }
     stop() {
         logger.log(TAG_NAME, 'stop', 'score: ', this.score);
-        this.stopDraw();
+        this.resetState();
+        this.emit('gameEnd');
     }
     pause() {
+        logger.log(TAG_NAME, 'pause');
         this.stopDraw();
+        this.emit('gamePause');
+    }
+    continue() {
+        logger.log(TAG_NAME, 'continue');
+        this.startDraw();
+        this.emit('gameContinue');
     }
     replay() {
-        /** */
+        logger.log(TAG_NAME, 'replay');
+        this.resetState();
+        this.startDraw();
+        this.emit('gameReplay');
+    }
+    destroy() {
+        logger.log(TAG_NAME, 'destroy');
+        this.resetState();
+        this.root.speechController.off('onSpeechResult', this.onSpeechResult);
     }
     startDraw() {
         this.drawCanvas();
@@ -967,12 +1003,22 @@ class GameController {
         }
     }
     resetState() {
-        /** */
+        this.stopDraw();
+        this.ctx.clearRect(0, 0, this.canvasDom.width, this.canvasDom.height);
+        this.downRate = 1000;
+        this.downHeight = 0.1;
+        this.genWordRate = 1000;
+        this.countdown = 20;
+        this.score = 0;
+        this.words = [];
+        this.emit('updateCountdown', this.countdown);
+        this.emit('updateScore', this.score);
     }
     drawCanvas() {
         this.ctx.clearRect(0, 0, this.canvasDom.width, this.canvasDom.height);
         this.words.forEach((item) => {
-            this.ctx.font = item.height + 'px';
+            this.ctx.font = item.font;
+            this.ctx.fillStyle = item.fillStyle;
             this.ctx.fillText(item.content, item.left, item.top);
         });
         if (this.countdown <= 0) {
@@ -984,7 +1030,7 @@ class GameController {
     down() {
         for (let i = 0; i < this.words.length; i++) {
             const item = this.words[i];
-            if (item.top < this.canvasDom.height) {
+            if (item.top - item.height < this.canvasDom.height) {
                 item.top += this.downHeight;
             }
             else {
@@ -1003,35 +1049,87 @@ class GameController {
             const item = this.words[i];
             if (item.content === text) {
                 this.score += item.score;
+                this.emit('updateScore', this.score);
                 this.words.splice(i, 1);
                 i--;
             }
         }
     };
     countdownHandler() {
+        logger.log(TAG_NAME, 'countdownHandler', this.countdown);
         this.countdown--;
+        this.emit('updateCountdown', this.countdown);
     }
 }
 
-class VoiceControlGame {
+class VoiceControlGame extends eventemitter3 {
     opt;
     gameController;
     speechController;
-    emitter;
     constructor(opt) {
+        super();
         this.opt = opt;
-        this.emitter = new eventemitter3();
-        this.gameController = new GameController(this);
         this.speechController = new SpeechController(this);
+        this.gameController = new GameController(this);
+        this.gameController.on('gameStart', this.onGameStart);
+        this.gameController.on('gameEnd', this.onGameEnd);
+        this.gameController.on('gameContinue', this.onGameContinue);
+        this.gameController.on('gamePause', this.onGamePause);
+        this.gameController.on('gameReplay', this.onGameReplay);
+        this.gameController.on('updateScore', this.onUpdateScore);
+        this.gameController.on('updateCountdown', this.onUpdateCountdown);
     }
     start() {
         this.gameController.start();
-        this.speechController.start();
     }
     stop() {
         this.gameController.stop();
-        this.speechController.stop();
     }
+    continue() {
+        this.gameController.continue();
+    }
+    pause() {
+        this.gameController.pause();
+    }
+    replay() {
+        this.gameController.replay();
+    }
+    destroy() {
+        this.gameController.destroy();
+        this.speechController.destroy();
+        this.gameController.off('gameStart', this.onGameStart);
+        this.gameController.off('gameEnd', this.onGameEnd);
+        this.gameController.off('gameContinue', this.onGameContinue);
+        this.gameController.off('gamePause', this.onGamePause);
+        this.gameController.off('updateScore', this.onUpdateScore);
+        this.gameController.off('updateCountdown', this.onUpdateCountdown);
+    }
+    onGameStart = () => {
+        this.speechController.start();
+        this.emit('gameStart');
+    };
+    onGameEnd = () => {
+        this.speechController.stop();
+        this.emit('gameEnd');
+    };
+    onGameContinue = () => {
+        this.speechController.start();
+        this.emit('gameContinue');
+    };
+    onGamePause = () => {
+        this.speechController.stop();
+        this.emit('gamePause');
+    };
+    onGameReplay = () => {
+        this.speechController.start();
+        this.emit('gameReplay');
+    };
+    onUpdateScore = (score) => {
+        this.emit('updateScore', score);
+    };
+    onUpdateCountdown = (countdown) => {
+        this.emit('updateCountdown', countdown);
+    };
 }
 
 export { VoiceControlGame as default };

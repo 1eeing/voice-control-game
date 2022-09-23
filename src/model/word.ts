@@ -1,10 +1,12 @@
-import { rangeNum } from '../utils'
+import { rangeNum, rangeRgb } from '../utils'
 
 class Word {
   width: number
   height = rangeNum(14, 30)
-  top = -this.height
+  top = 0
   left: number
+  font = this.height + 'px serif'
+  fillStyle = rangeRgb()
   score = Math.floor((1 / this.height) * 100)
 
   constructor(
@@ -12,8 +14,8 @@ class Word {
     private ctx: CanvasRenderingContext2D,
     public content: string
   ) {
-    this.left = rangeNum(0, this.canvasDom.width - this.height)
     this.width = this.ctx.measureText(this.content).width
+    this.left = rangeNum(0, this.canvasDom.width - this.width)
   }
 }
 

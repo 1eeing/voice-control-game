@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>语音切水果</title>
     <style>
       #canvas {
         width: 350px;
@@ -15,15 +15,98 @@
   </head>
   <body>
     <canvas id="canvas"></canvas>
+    <div>
+      <span>倒计时：</span>
+      <span id="countdown"></span>
+      <span>得分：</span>
+      <span id="score"></span>
+    </div>
+    <div>
+      <button id="startGame">开始游戏</button>
+      <button id="pauseGame">暂停游戏</button>
+      <button id="continueGame">继续游戏</button>
+      <button id="endGame">结束游戏</button>
+      <button id="replayGame">重新游玩</button>
+    </div>
     <script type="module">
       import VoiceControlGame from './index.esm.js'
 
-      const canvas = document.getElementById('canvas')
-      const game = new VoiceControlGame({
-        canvasDom: canvas,
-        lang: 'zh-CN',
-      })
-      game.start()
+      const $canvas = document.getElementById('canvas')
+      const $countdown = document.getElementById('countdown')
+      const $score = document.getElementById('score')
+      const $startGame = document.getElementById('startGame')
+      const $pauseGame = document.getElementById('pauseGame')
+      const $continueGame = document.getElementById('continueGame')
+      const $endGame = document.getElementById('endGame')
+      const $replayGame = document.getElementById('replayGame')
+
+      function init() {
+        const search = new URLSearchParams(location.search)
+
+        const game = new VoiceControlGame({
+          canvasDom: $canvas,
+          lang: search.get('lang') || 'zh-CN',
+        })
+
+        game.on('gameStart', () => {
+          isPlaying = true
+        })
+
+        game.on('gameEnd', () => {
+          isPlaying = false
+        })
+
+        game.on('gamePause', () => {
+          isPlaying = false
+        })
+
+        game.on('gameContinue', () => {
+          isPlaying = true
+        })
+
+        game.on('updateCountdown', (countdown) => {
+          $countdown.innerText = countdown + 's'
+        })
+
+        game.on('updateScore', (score) => {
+          $score.innerText = score + '分'
+        })
+
+        let isPlaying = false
+
+        $startGame.addEventListener('click', () => {
+          if (!isPlaying) {
+            game.start()
+            isPlaying = true
+          }
+        })
+
+        $pauseGame.addEventListener('click', () => {
+          if (isPlaying) {
+            game.pause()
+            isPlaying = false
+          }
+        })
+
+        $continueGame.addEventListener('click', () => {
+          if (!isPlaying) {
+            game.continue()
+            isPlaying = true
+          }
+        })
+
+        $endGame.addEventListener('click', () => {
+          game.stop()
+          isPlaying = false
+        })
+
+        $replayGame.addEventListener('click', () => {
+          game.replay()
+          isPlaying = true
+        })
+      }
+
+      init()
     </script>
   </body>
 </html>
